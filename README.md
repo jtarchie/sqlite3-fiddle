@@ -83,7 +83,7 @@ primary-key lookups, and a Ruby scalar function over every row. Seconds, lower i
 | MRI 4.0.7, this gem                   |   1.05 |   1.37 |        1.38 |         0.33 |          0.51 |
 | MRI 4.0.7 `--yjit`, this gem          |   0.81 |   1.23 |        1.22 |         0.27 |          0.43 |
 | JRuby 10.1.2 (Java 27), this gem      |   2.12 |   1.23 |        0.91 |         0.28 |          0.54 |
-| rb2go (compiled to Go), this gem      |   0.15 |   0.22 |        0.32 |         0.06 |          0.10 |
+| rb2go (compiled to Go), this gem      |   0.15 |   0.20 |        0.29 |         0.05 |          0.10 |
 
 Best of three runs on an Apple M4, Homebrew sqlite 3.54.0 (the C ext gem bundles 3.54.1). Reproduce with
 `ruby -Ilib bench/benchmark.rb`, `jruby -Ilib bench/benchmark.rb`, `ruby -e 'gem "sqlite3"' -e 'load "bench/benchmark.rb"'`,
@@ -92,7 +92,7 @@ and `rb2go build -o bench bench/benchmark.rb && ./bench`.
 Each row of `select` crosses Fiddle about ten times (step, column count, type and value per column), as the C
 extension crosses into libsqlite3, and `ruby_function` crosses back into Ruby once per row plus three calls out.
 Under rb2go each crossing is a Go-to-C call (~80 ns, where the C extension pays a few ns): the same `select` made
-straight from Go, with no Ruby at all, takes 0.105 s, so select, select_hash and ruby_function stay several times
+straight from Go, with no Ruby at all, takes 0.08 s, so select, select_hash and ruby_function stay several times
 slower than the C extension, while insert and point_lookup are close to it. ruby2go's docs/design.md decision 329
 has how the compiled calls got there (from 1.14 / 1.67 / 2.16 / 0.48 / 0.56 s). Fiddle calls keep the GVL, as the C
 extension does; fiddle's default hands it off and back on every call, which made MRI's reads ~5× slower.
