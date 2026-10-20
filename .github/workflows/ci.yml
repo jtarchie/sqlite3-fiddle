@@ -46,7 +46,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: ruby2go/go.mod
-      # ruby2go embeds gems/sqlite3-fiddle/lib; put this checkout there so the compiled copy is this commit's
-      - run: rm -rf ruby2go/gems/sqlite3-fiddle && cp -r sqlite3-fiddle ruby2go/gems/sqlite3-fiddle
+      # ruby2go embeds vendored/sqlite3-fiddle, a mirror of its gems/sqlite3-fiddle submodule; put this commit's lib in both
+      - run: |
+          rm -rf ruby2go/gems/sqlite3-fiddle && cp -r sqlite3-fiddle ruby2go/gems/sqlite3-fiddle
+          mkdir -p ruby2go/vendored/sqlite3-fiddle && cp sqlite3-fiddle/lib/*.rb ruby2go/vendored/sqlite3-fiddle/
       - run: go run ./cmd/rb2go test ../sqlite3-fiddle/test/sqlite3_test.rb --seed 1
         working-directory: ruby2go
