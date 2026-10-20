@@ -212,8 +212,9 @@ module SQLite3
     end
   end
 
+  # host_os, not RUBY_PLATFORM: JRuby's RUBY_PLATFORM is "java".
   #: () -> String
-  def self.__lib_name = RUBY_PLATFORM.include?("darwin") ? "libsqlite3.dylib" : "libsqlite3.so.0"
+  def self.__lib_name = RbConfig::CONFIG["host_os"].to_s.include?("darwin") ? "libsqlite3.dylib" : "libsqlite3.so.0"
 
   # The C API through Fiddle::Importer: each extern is a typed module method (rb2go compiles the literal signatures, decision 326).
   module C
@@ -273,8 +274,8 @@ module SQLite3
     extern "void sqlite3_result_null(void *)"
     extern "void sqlite3_result_error(void *, void *, int)"
 
-    # sqlite3_error_offset arrived in SQLite 3.38; older libraries have no symbol.
-    ERROR_OFFSET = HANDLE.sym_defined?("sqlite3_error_offset").nil? ? nil : Fiddle::Function.new(HANDLE["sqlite3_error_offset"], [Fiddle::TYPE_VOIDP], Fiddle::TYPE_INT) #: Fiddle::Function?
+    # sqlite3_error_offset arrived in SQLite 3.38; older libraries have no symbol. sym_defined? is an address or nil on MRI, a bool on JRuby's FFI backend.
+    ERROR_OFFSET = HANDLE.sym_defined?("sqlite3_error_offset") ? Fiddle::Function.new(HANDLE["sqlite3_error_offset"], [Fiddle::TYPE_VOIDP], Fiddle::TYPE_INT) : nil #: Fiddle::Function?
 
     # Pointer.read's String is binary under MRI; a TEXT column is UTF-8 (rb2go derives encoding from the bytes, decision 136).
     #: (Fiddle::Pointer, Integer) -> String
@@ -665,10 +666,11 @@ module SQLite3
 
         mode = SQLite3.__int(flags)
       end
-      out = Fiddle::Pointer.malloc(Fiddle::SIZEOF_VOIDP)
+      # call_free, not Fiddle.free: JRuby's Fiddle.free wants a Pointer, rb2go's an Integer.
+      out = Fiddle::Pointer.malloc(Fiddle::SIZEOF_VOIDP, Fiddle::RUBY_FREE)
       rc = C.sqlite3_open_v2(file, out, mode, nil)
       @db = out.ptr.to_i #: Integer
-      Fiddle.free(out.to_i)
+      out.call_free
       @closed = false
       if rc != 0
         msg = @db.zero? ? "out of memory" : C.sqlite3_errmsg(@db).to_s
@@ -1009,16 +1011,16 @@ module SQLite3
       @columns = nil #: Array[String]?
       @types = nil #: Array[String?]?
       @done = false
-      src = Fiddle::Pointer.malloc(sql.bytesize + 1)
+      src = Fiddle::Pointer.malloc(sql.bytesize + 1, Fiddle::RUBY_FREE)
       src[0, sql.bytesize + 1] = sql + "\0"
-      out = Fiddle::Pointer.malloc(Fiddle::SIZEOF_VOIDP)
-      tail = Fiddle::Pointer.malloc(Fiddle::SIZEOF_VOIDP)
+      out = Fiddle::Pointer.malloc(Fiddle::SIZEOF_VOIDP, Fiddle::RUBY_FREE)
+      tail = Fiddle::Pointer.malloc(Fiddle::SIZEOF_VOIDP, Fiddle::RUBY_FREE)
       rc = C.sqlite3_prepare_v2(db.__db, src, sql.bytesize, out, tail)
       @st = out.ptr.to_i #: Integer
       used = tail.ptr.to_i - src.to_i
-      Fiddle.free(out.to_i)
-      Fiddle.free(tail.to_i)
-      Fiddle.free(src.to_i)
+      out.call_free
+      tail.call_free
+      src.call_free
       @remainder = rc == 0 && used >= 0 && used <= sql.bytesize ? sql.byteslice(used, sql.bytesize - used).to_s : ""
       db.__check(rc, sql)
     end

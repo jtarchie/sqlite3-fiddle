@@ -13,9 +13,15 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        ruby: ["3.3", "3.4", "4.0", "head"]
+        ruby: ["3.3", "3.4", "4.0", "head", "jruby"]
     steps:
       - uses: actions/checkout@v4
+      # JRuby 10 needs Java 21; runner images default older
+      - uses: actions/setup-java@v4
+        if: matrix.ruby == 'jruby'
+        with:
+          distribution: temurin
+          java-version: "21"
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.ruby }}
