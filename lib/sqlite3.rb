@@ -666,10 +666,11 @@ module SQLite3
 
         mode = SQLite3.__int(flags)
       end
-      out = Fiddle::Pointer.malloc(Fiddle::SIZEOF_VOIDP)
+      # call_free, not Fiddle.free: JRuby's Fiddle.free wants a Pointer, rb2go's an Integer.
+      out = Fiddle::Pointer.malloc(Fiddle::SIZEOF_VOIDP, Fiddle::RUBY_FREE)
       rc = C.sqlite3_open_v2(file, out, mode, nil)
       @db = out.ptr.to_i #: Integer
-      Fiddle.free(out.to_i)
+      out.call_free
       @closed = false
       if rc != 0
         msg = @db.zero? ? "out of memory" : C.sqlite3_errmsg(@db).to_s
@@ -1010,16 +1011,16 @@ module SQLite3
       @columns = nil #: Array[String]?
       @types = nil #: Array[String?]?
       @done = false
-      src = Fiddle::Pointer.malloc(sql.bytesize + 1)
+      src = Fiddle::Pointer.malloc(sql.bytesize + 1, Fiddle::RUBY_FREE)
       src[0, sql.bytesize + 1] = sql + "\0"
-      out = Fiddle::Pointer.malloc(Fiddle::SIZEOF_VOIDP)
-      tail = Fiddle::Pointer.malloc(Fiddle::SIZEOF_VOIDP)
+      out = Fiddle::Pointer.malloc(Fiddle::SIZEOF_VOIDP, Fiddle::RUBY_FREE)
+      tail = Fiddle::Pointer.malloc(Fiddle::SIZEOF_VOIDP, Fiddle::RUBY_FREE)
       rc = C.sqlite3_prepare_v2(db.__db, src, sql.bytesize, out, tail)
       @st = out.ptr.to_i #: Integer
       used = tail.ptr.to_i - src.to_i
-      Fiddle.free(out.to_i)
-      Fiddle.free(tail.to_i)
-      Fiddle.free(src.to_i)
+      out.call_free
+      tail.call_free
+      src.call_free
       @remainder = rc == 0 && used >= 0 && used <= sql.bytesize ? sql.byteslice(used, sql.bytesize - used).to_s : ""
       db.__check(rc, sql)
     end
