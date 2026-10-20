@@ -46,6 +46,8 @@ The code is written for a static compiler, which explains the non-idiomatic bits
 - Blocks have fixed arity (no splats through typed blocks) — hence `create_function`'s six-arg cap.
 - Methods prefixed `__` are internal helpers, not gem API.
 
+Fiddle differs across MRI's C ext, JRuby's FFI backend, and rb2go's prelude (`prelude/fiddle.rb`, `sig/fiddle.rbs` in ruby2go). Stick to the intersection: free scratch memory with `Pointer.malloc(n, Fiddle::RUBY_FREE)` + `call_free` (`Fiddle.free` wants a Pointer on JRuby, an Integer on rb2go); test `sym_defined?` for truthiness (address/nil on MRI, bool on JRuby); detect the OS via `RbConfig::CONFIG["host_os"]` (`RUBY_PLATFORM` is `"java"` on JRuby). CI's JRuby job needs Java 21.
+
 Intentional differences from the real gem (keep README in sync if these change): `Blob` not a String; `prepare`/`query`/`execute` with a block return the Statement/ResultSet/`[]` rather than the block's value; no aggregates, authorizers, busy handlers, tracing, collations, extensions, backup, or serialize.
 
 ## Style
