@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The sqlite3 gem's API (v2.10 surface: `Database`, `Statement`, `ResultSet`, pragmas, error classes) in pure Ruby over Fiddle and the system `libsqlite3`. No C extension. Two consumers that must both work:
 
-- **MRI** (Ruby >= 3.3) — plain gem.
+- **MRI** (Ruby >= 3.3) and **JRuby** (10+, via fiddle's FFI backend) — plain gem.
 - **rb2go** ([jtarchie/ruby2go](https://github.com/jtarchie/ruby2go)) — a Ruby→Go compiler that vendors this repo at `gems/sqlite3-fiddle` and answers `require "sqlite3"` with it. The compiled program's output must match MRI's.
 
 "decision N" comments refer to ruby2go's `docs/design.md`, not anything in this repo.
@@ -14,7 +14,7 @@ The sqlite3 gem's API (v2.10 surface: `Database`, `Statement`, `ResultSet`, prag
 ## Commands
 
 ```sh
-bundle exec rake test TESTOPTS="--seed=1"                 # what CI runs (MRI 3.3/3.4/4.0/head, Linux + macOS)
+bundle exec rake test TESTOPTS="--seed=1"                 # what CI runs (MRI 3.3/3.4/4.0/head + JRuby, Linux + macOS)
 ruby -Ilib -Itest test/sqlite3_test.rb -n test_binds      # one test
 ```
 

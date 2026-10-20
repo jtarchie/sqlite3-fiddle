@@ -212,8 +212,9 @@ module SQLite3
     end
   end
 
+  # host_os, not RUBY_PLATFORM: JRuby's RUBY_PLATFORM is "java".
   #: () -> String
-  def self.__lib_name = RUBY_PLATFORM.include?("darwin") ? "libsqlite3.dylib" : "libsqlite3.so.0"
+  def self.__lib_name = RbConfig::CONFIG["host_os"].to_s.include?("darwin") ? "libsqlite3.dylib" : "libsqlite3.so.0"
 
   # The C API through Fiddle::Importer: each extern is a typed module method (rb2go compiles the literal signatures, decision 326).
   module C
@@ -273,8 +274,8 @@ module SQLite3
     extern "void sqlite3_result_null(void *)"
     extern "void sqlite3_result_error(void *, void *, int)"
 
-    # sqlite3_error_offset arrived in SQLite 3.38; older libraries have no symbol.
-    ERROR_OFFSET = HANDLE.sym_defined?("sqlite3_error_offset").nil? ? nil : Fiddle::Function.new(HANDLE["sqlite3_error_offset"], [Fiddle::TYPE_VOIDP], Fiddle::TYPE_INT) #: Fiddle::Function?
+    # sqlite3_error_offset arrived in SQLite 3.38; older libraries have no symbol. sym_defined? is an address or nil on MRI, a bool on JRuby's FFI backend.
+    ERROR_OFFSET = HANDLE.sym_defined?("sqlite3_error_offset") ? Fiddle::Function.new(HANDLE["sqlite3_error_offset"], [Fiddle::TYPE_VOIDP], Fiddle::TYPE_INT) : nil #: Fiddle::Function?
 
     # Pointer.read's String is binary under MRI; a TEXT column is UTF-8 (rb2go derives encoding from the bytes, decision 136).
     #: (Fiddle::Pointer, Integer) -> String
