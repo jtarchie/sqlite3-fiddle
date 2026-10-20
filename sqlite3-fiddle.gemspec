@@ -8,7 +8,7 @@ Gem::Specification.new do |s|
   s.authors = ["JT Archie"]
   s.license = "MIT"
   s.homepage = "https://github.com/jtarchie/ruby2go/tree/main/gems/sqlite3-fiddle"
-  s.files = ["lib/sqlite3.rb", "README.md", "LICENSE"]
+  s.files = Dir["lib/**/*.rb"] + ["README.md", "LICENSE", "LICENSE-sqlite3-ruby"]
   s.required_ruby_version = ">= 3.3"
   s.add_dependency "fiddle", ">= 1.1"
 end
