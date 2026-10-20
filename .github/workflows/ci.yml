@@ -23,8 +23,12 @@ jobs:
       - run: bundle exec rake test TESTOPTS="--seed 1"
 
   ruby2go:
-    name: compiled by ruby2go
-    runs-on: ubuntu-latest
+    name: compiled by ruby2go / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
         with:
