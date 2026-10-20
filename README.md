@@ -1,9 +1,10 @@
 # sqlite3-fiddle
 
-The [sqlite3 gem](https://github.com/sparklemotion/sqlite3-ruby)'s API (`SQLite3::Database`, `Statement`,
-`ResultSet`, pragmas, error classes) in pure Ruby, calling the system `libsqlite3` through Fiddle. No C
-extension, so it runs on MRI and compiles under [rb2go](https://github.com/jtarchie/ruby2go), which vendors
-it here and answers `require "sqlite3"` with it (docs/design.md decision 328).
+A drop-in replacement for the [sqlite3 gem](https://github.com/sparklemotion/sqlite3-ruby) (2.10.1) in pure
+Ruby: the same `lib/` layout and Ruby code as the gem, with its C extension (`ext/sqlite3`) replaced by a
+Fiddle port in `lib/sqlite3/native/` that calls the system `libsqlite3`. No compiler needed, so it runs on MRI,
+on JRuby, and compiles under [rb2go](https://github.com/jtarchie/ruby2go), which vendors it to answer
+`require "sqlite3"` (rb2go's docs/design.md decision 328).
 
 ```ruby
 require "sqlite3"
@@ -14,15 +15,86 @@ db.execute("insert into t (name) values (?)", ["a"])
 p db.execute("select * from t")   # [[1, "a"]]
 ```
 
-Under MRI with the real `sqlite3` gem installed too, put this gem's `lib` first on the load path
-(`ruby -I gems/sqlite3-fiddle/lib`) or do not install the other. The library is `libsqlite3.dylib` on macOS
-and `libsqlite3.so.0` elsewhere.
+| upstream                  | here                                                  |
+| ------------------------- | ----------------------------------------------------- |
+| `lib/sqlite3.rb`, `lib/sqlite3/*.rb` | same files, same code, with `#:` type annotations |
+| `ext/sqlite3/sqlite3.c`   | `lib/sqlite3/native/sqlite3.rb` (+ `ffi.rb`, the extern table) |
+| `ext/sqlite3/database.c`, `aggregator.c` | `lib/sqlite3/native/database.rb`       |
+| `ext/sqlite3/statement.c` | `lib/sqlite3/native/statement.rb`                     |
+| `ext/sqlite3/backup.c`    | `lib/sqlite3/native/backup.rb`                        |
+| `ext/sqlite3/exception.c` | `lib/sqlite3/native/exception.rb`                     |
+| `test/*.rb`               | same files (plus `test/sqlite3_test.rb`, shared with rb2go) |
 
-Differences from the sqlite3 gem: `SQLite3::Blob` is a marker class rather than a String subclass (columns
-still read back as Strings); `prepare`, `query` and `execute` with a block return the Statement, ResultSet or
-an empty Array, not the block's value; `create_function` blocks take up to six arguments; no aggregates,
-authorizers, busy handlers, tracing, collations, extensions, backup or serialize.
+## Which libsqlite3
 
-Tests: rb2go's `testdata/test/sqlite3_test.rb` runs against this gem under MRI
-(`ruby -I gems/sqlite3-fiddle/lib ... testdata/test/sqlite3_test.rb`) and against the real gem, and the
-compiled program's output must match MRI's.
+`libsqlite3.so.0` on Linux. On macOS, Homebrew's (`brew install sqlite`) when it is installed, else the
+system's, which is built without `load_extension` and is older than the 3.54 that `Database#deserialize`
+needs. `SQLITE3_FIDDLE_LIB=/path/to/libsqlite3` overrides both. Features the loaded library lacks are left
+undefined, as the C extension's `#ifdef HAVE_*` leaves them: `enable_load_extension`, `deserialize`,
+`Statement#database_name`.
+
+If the real `sqlite3` gem is installed too, put this gem's `lib` first on the load path or it shadows this one.
+
+## Tests
+
+Every upstream test file runs here, against this gem and against the real gem:
+
+```sh
+bundle exec rake test TESTOPTS="--seed=1"      # lib/ (MRI or JRuby)
+bundle exec rake test:gem TESTOPTS="--seed=1"  # the sqlite3 gem's C extension, same files (MRI)
+```
+
+On MRI with Homebrew's sqlite: 390 runs, 0 failures, 5 skips. The skips are upstream's own: URI filenames and
+the `dbstat`/`sqlite_dbpage` tables are tested only when the gem bundles its own sqlite
+(`SQLITE_PACKAGED_LIBRARIES`), since system builds vary. Forced on, URI and dbstat pass with Homebrew's build;
+it has no `sqlite_dbpage`.
+
+## Not supported
+
+Attempted, and out of reach on that runtime:
+
+**JRuby**
+- `fork` safety: JRuby has no `fork`, so the discard tests skip (as they do for the real gem on any runtime without it).
+- Two upstream tests skip on JRuby (`test_replacing_a_collation_releases_the_previous_comparator`,
+  `test_aggregate_instances_are_released_after_each_query`): they count live objects right after `GC.start`,
+  which the JVM does not promise to honor. Run the suite with `JRUBY_OPTS=-X+O` so `ObjectSpace.each_object` works.
+
+**rb2go** (only `test/sqlite3_test.rb` runs there; these are compiled out with a class-body
+`defined?(::Binding)` guard, which rb2go folds to false and MRI/JRuby to true)
+- Aggregates: `create_aggregate`, `create_aggregate_handler` and `define_aggregator` build classes at run time
+  (`Class.new`, `define_method`).
+- `Database#authorizer { }` (block form): rb2go cannot store a block it never calls; `authorizer =` a callable works.
+- `load_extension`, `enable_load_extension` and the `extensions:` option.
+- `strict: true`: `sqlite3_db_config` is variadic, and rb2go's purego cannot make variadic C calls.
+- Fork safety: `Process._fork` cannot be prepended, so a forked child keeps its connections.
+- `define_function` registers every function as variadic (`-1`), since rb2go has no `Proc#arity`.
+- `SQLite3::Blob` is a marker class, not a `String` subclass: rb2go widens a `String` subclass to `String` in a
+  mixed literal (its decision 150), losing the type. Columns still read back as Strings.
+- `ResultSet#each`/`#each_hash` without a block (an Enumerator) raise `NotImplementedError`.
+
+## Benchmark
+
+`bench/benchmark.rb`: 100,000-row insert in a transaction, a full `select`, the same as hashes, 20,000
+primary-key lookups, and a Ruby scalar function over every row. Seconds, lower is better.
+
+| runtime                               | insert | select | select_hash | point_lookup | ruby_function |
+| ------------------------------------- | -----: | -----: | ----------: | -----------: | ------------: |
+| MRI 4.0.7, sqlite3 gem 2.10.1 (C ext) |   0.16 |   0.05 |        0.10 |         0.03 |          0.01 |
+| MRI 4.0.7, this gem                   |   1.30 |   1.39 |        1.38 |         0.36 |          0.51 |
+| MRI 4.0.7 `--yjit`, this gem          |   1.03 |   1.25 |        1.23 |         0.30 |          0.43 |
+| JRuby 10.1.2 (Java 27), this gem      |   2.27 |   1.23 |        0.88 |         0.29 |          0.52 |
+| rb2go (compiled to Go), this gem      |   1.14 |   1.67 |        2.16 |         0.48 |          0.56 |
+
+Best of three runs on an Apple M4, Homebrew sqlite 3.54.0 (the C ext gem bundles 3.54.1). Reproduce with
+`ruby -Ilib bench/benchmark.rb`, `jruby -Ilib bench/benchmark.rb`, `ruby -e 'gem "sqlite3"' -e 'load "bench/benchmark.rb"'`,
+and `rb2go build -o bench bench/benchmark.rb && ./bench`. The rb2go row needs ruby2go's `Thread.current` fast path:
+before it, every Fiddle call parsed a goroutine stack trace to set `Fiddle.last_error`, and the same run took 7–35 s.
+
+Each row of `select` crosses Fiddle about ten times (step, column count, type and value per column), where the C
+extension makes those calls in C. Fiddle calls keep the GVL, as the C extension does; fiddle's default hands
+it off and back on every call, which made reads ~5× slower.
+
+## License
+
+MIT (`LICENSE`). The Ruby code and tests ported from the sqlite3 gem keep its BSD-3-Clause license
+(`LICENSE-sqlite3-ruby`).

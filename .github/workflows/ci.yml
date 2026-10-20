@@ -22,11 +22,19 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      # macOS' own libsqlite3 omits load_extension; lib/ prefers Homebrew's when present
+      - if: runner.os == 'macOS'
+        run: brew install sqlite
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.ruby }}
           bundler-cache: true
       - run: bundle exec rake test TESTOPTS="--seed=1"
+        env:
+          JRUBY_OPTS: -X+O # the upstream tests count instances with ObjectSpace.each_object
+      # the same tests against the sqlite3 gem this one replaces (its C extension does not build on JRuby)
+      - if: matrix.ruby != 'jruby'
+        run: bundle exec rake test:gem TESTOPTS="--seed=1"
 
   ruby2go:
     name: compiled by ruby2go / ${{ matrix.os }}
@@ -49,6 +57,6 @@ jobs:
       # ruby2go embeds vendored/sqlite3-fiddle, a mirror of its gems/sqlite3-fiddle submodule; put this commit's lib in both
       - run: |
           rm -rf ruby2go/gems/sqlite3-fiddle && cp -r sqlite3-fiddle ruby2go/gems/sqlite3-fiddle
-          mkdir -p ruby2go/vendored/sqlite3-fiddle && cp sqlite3-fiddle/lib/*.rb ruby2go/vendored/sqlite3-fiddle/
+          rm -rf ruby2go/vendored/sqlite3-fiddle && mkdir -p ruby2go/vendored/sqlite3-fiddle && cp -R sqlite3-fiddle/lib/. ruby2go/vendored/sqlite3-fiddle/
       - run: go run ./cmd/rb2go test ../sqlite3-fiddle/test/sqlite3_test.rb --seed 1
         working-directory: ruby2go
