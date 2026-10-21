@@ -91,7 +91,7 @@ and `rb2go build -o bench bench/benchmark.rb && ./bench`.
 
 Each row of `select` crosses Fiddle about ten times (step, column count, type and value per column), as the C
 extension crosses into libsqlite3, and `ruby_function` crosses back into Ruby once per row plus three calls out.
-Under rb2go each crossing is a Go-to-C call (~80 ns, where the C extension pays a few ns): the same `select` made
+Under rb2go each crossing is a Go-to-C call (~46 ns, where the C extension pays a few ns): the same `select` made
 straight from Go, with no Ruby at all, takes 0.08 s, so select, select_hash and ruby_function stay several times
 slower than the C extension, while insert and point_lookup are close to it. ruby2go's docs/design.md decision 329
 has how the compiled calls got there (from 1.14 / 1.67 / 2.16 / 0.48 / 0.56 s). Fiddle calls keep the GVL, as the C
