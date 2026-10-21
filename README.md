@@ -80,6 +80,7 @@ primary-key lookups, and a Ruby scalar function over every row. Seconds, lower i
 | runtime                               | insert | select | select_hash | point_lookup | ruby_function |
 | ------------------------------------- | -----: | -----: | ----------: | -----------: | ------------: |
 | MRI 4.0.7, sqlite3 gem 2.10.1 (C ext) |   0.16 |   0.05 |        0.10 |         0.03 |          0.01 |
+| MRI 4.0.7 `--yjit`, sqlite3 gem C ext |   0.12 |   0.05 |        0.09 |         0.02 |          0.01 |
 | MRI 4.0.7, this gem                   |   1.05 |   1.37 |        1.38 |         0.33 |          0.51 |
 | MRI 4.0.7 `--yjit`, this gem          |   0.81 |   1.23 |        1.22 |         0.27 |          0.43 |
 | JRuby 10.1.2 (Java 27), this gem      |   2.12 |   1.23 |        0.91 |         0.28 |          0.54 |
