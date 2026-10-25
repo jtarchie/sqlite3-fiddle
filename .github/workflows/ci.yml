@@ -36,8 +36,8 @@ jobs:
       - if: matrix.ruby != 'jruby'
         run: bundle exec rake test:gem TESTOPTS="--seed=1"
 
-  ruby2go:
-    name: compiled by ruby2go / ${{ matrix.os }}
+  rugaroo:
+    name: compiled by rugaroo / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -49,14 +49,14 @@ jobs:
           path: sqlite3-fiddle
       - uses: actions/checkout@v4
         with:
-          repository: jtarchie/ruby2go
-          path: ruby2go
+          repository: jtarchie/rugaroo
+          path: rugaroo
       - uses: actions/setup-go@v5
         with:
-          go-version-file: ruby2go/go.mod
-      # ruby2go embeds vendored/sqlite3-fiddle, a mirror of its gems/sqlite3-fiddle submodule; put this commit's lib in both
+          go-version-file: rugaroo/go.mod
+      # rugaroo embeds vendored/sqlite3-fiddle, a mirror of its gems/sqlite3-fiddle submodule; put this commit's lib in both
       - run: |
-          rm -rf ruby2go/gems/sqlite3-fiddle && cp -r sqlite3-fiddle ruby2go/gems/sqlite3-fiddle
-          rm -rf ruby2go/vendored/sqlite3-fiddle && mkdir -p ruby2go/vendored/sqlite3-fiddle && cp -R sqlite3-fiddle/lib/. ruby2go/vendored/sqlite3-fiddle/
-      - run: go run ./cmd/rb2go test ../sqlite3-fiddle/test/sqlite3_test.rb --seed 1
-        working-directory: ruby2go
+          rm -rf rugaroo/gems/sqlite3-fiddle && cp -r sqlite3-fiddle rugaroo/gems/sqlite3-fiddle
+          rm -rf rugaroo/vendored/sqlite3-fiddle && mkdir -p rugaroo/vendored/sqlite3-fiddle && cp -R sqlite3-fiddle/lib/. rugaroo/vendored/sqlite3-fiddle/
+      - run: go run ./cmd/rugaroo test ../sqlite3-fiddle/test/sqlite3_test.rb --seed 1
+        working-directory: rugaroo

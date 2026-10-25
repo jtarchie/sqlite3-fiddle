@@ -3,8 +3,8 @@
 A drop-in replacement for the [sqlite3 gem](https://github.com/sparklemotion/sqlite3-ruby) (2.10.1) in pure
 Ruby: the same `lib/` layout and Ruby code as the gem, with its C extension (`ext/sqlite3`) replaced by a
 Fiddle port in `lib/sqlite3/native/` that calls the system `libsqlite3`. No compiler needed, so it runs on MRI,
-on JRuby, and compiles under [rb2go](https://github.com/jtarchie/ruby2go), which vendors it to answer
-`require "sqlite3"` (rb2go's docs/design.md decision 328).
+on JRuby, and compiles under [rugaroo](https://github.com/jtarchie/rugaroo), which vendors it to answer
+`require "sqlite3"` (rugaroo's docs/design.md decision 328).
 
 ```ruby
 require "sqlite3"
@@ -23,7 +23,7 @@ p db.execute("select * from t")   # [[1, "a"]]
 | `ext/sqlite3/statement.c` | `lib/sqlite3/native/statement.rb`                     |
 | `ext/sqlite3/backup.c`    | `lib/sqlite3/native/backup.rb`                        |
 | `ext/sqlite3/exception.c` | `lib/sqlite3/native/exception.rb`                     |
-| `test/*.rb`               | same files (plus `test/sqlite3_test.rb`, shared with rb2go) |
+| `test/*.rb`               | same files (plus `test/sqlite3_test.rb`, shared with rugaroo) |
 
 ## Which libsqlite3
 
@@ -59,16 +59,16 @@ Attempted, and out of reach on that runtime:
   `test_aggregate_instances_are_released_after_each_query`): they count live objects right after `GC.start`,
   which the JVM does not promise to honor. Run the suite with `JRUBY_OPTS=-X+O` so `ObjectSpace.each_object` works.
 
-**rb2go** (only `test/sqlite3_test.rb` runs there; these are compiled out with a class-body
-`defined?(::Binding)` guard, which rb2go folds to false and MRI/JRuby to true)
+**rugaroo** (only `test/sqlite3_test.rb` runs there; these are compiled out with a class-body
+`defined?(::Binding)` guard, which rugaroo folds to false and MRI/JRuby to true)
 - Aggregates: `create_aggregate`, `create_aggregate_handler` and `define_aggregator` build classes at run time
   (`Class.new`, `define_method`).
-- `Database#authorizer { }` (block form): rb2go cannot store a block it never calls; `authorizer =` a callable works.
+- `Database#authorizer { }` (block form): rugaroo cannot store a block it never calls; `authorizer =` a callable works.
 - `load_extension`, `enable_load_extension` and the `extensions:` option.
-- `strict: true`: `sqlite3_db_config` is variadic, and rb2go's purego cannot make variadic C calls.
+- `strict: true`: `sqlite3_db_config` is variadic, and rugaroo's purego cannot make variadic C calls.
 - Fork safety: `Process._fork` cannot be prepended, so a forked child keeps its connections.
-- `define_function` registers every function as variadic (`-1`), since rb2go has no `Proc#arity`.
-- `SQLite3::Blob` is a marker class, not a `String` subclass: rb2go widens a `String` subclass to `String` in a
+- `define_function` registers every function as variadic (`-1`), since rugaroo has no `Proc#arity`.
+- `SQLite3::Blob` is a marker class, not a `String` subclass: rugaroo widens a `String` subclass to `String` in a
   mixed literal (its decision 150), losing the type. Columns still read back as Strings.
 - `ResultSet#each`/`#each_hash` without a block (an Enumerator) raise `NotImplementedError`.
 
@@ -81,20 +81,20 @@ primary-key lookups, and a Ruby scalar function over every row. Seconds, lower i
 | ------------------------------------- | -----: | -----: | ----------: | -----------: | ------------: |
 | MRI 4.0.7, sqlite3 gem 2.10.1 (C ext) |   0.16 |   0.05 |        0.10 |         0.03 |          0.01 |
 | MRI 4.0.7 `--yjit`, sqlite3 gem C ext |   0.12 |   0.05 |        0.09 |         0.02 |          0.01 |
-| MRI 4.0.7, this gem                   |   1.05 |   1.37 |        1.38 |         0.33 |          0.51 |
-| MRI 4.0.7 `--yjit`, this gem          |   0.81 |   1.23 |        1.22 |         0.27 |          0.43 |
-| JRuby 10.1.2 (Java 27), this gem      |   2.12 |   1.23 |        0.91 |         0.28 |          0.54 |
-| rb2go (compiled to Go), this gem      |   0.15 |   0.20 |        0.29 |         0.05 |          0.10 |
+| MRI 4.0.7, this gem                   |   1.03 |   1.36 |        1.37 |         0.33 |          0.50 |
+| MRI 4.0.7 `--yjit`, this gem          |   0.83 |   1.27 |        1.24 |         0.27 |          0.43 |
+| JRuby 10.1.2 (Java 27), this gem      |   2.09 |   1.19 |        0.97 |         0.29 |          0.53 |
+| rugaroo (compiled to Go), this gem    |   0.15 |   0.21 |        0.26 |         0.05 |          0.10 |
 
 Best of three runs on an Apple M4, Homebrew sqlite 3.54.0 (the C ext gem bundles 3.54.1). Reproduce with
 `ruby -Ilib bench/benchmark.rb`, `jruby -Ilib bench/benchmark.rb`, `ruby -e 'gem "sqlite3"' -e 'load "bench/benchmark.rb"'`,
-and `rb2go build -o bench bench/benchmark.rb && ./bench`.
+and `rugaroo build -o bench bench/benchmark.rb && ./bench`.
 
 Each row of `select` crosses Fiddle about ten times (step, column count, type and value per column), as the C
 extension crosses into libsqlite3, and `ruby_function` crosses back into Ruby once per row plus three calls out.
-Under rb2go each crossing is a Go-to-C call (~46 ns, where the C extension pays a few ns): the same `select` made
+Under rugaroo each crossing is a Go-to-C call (~46 ns, where the C extension pays a few ns): the same `select` made
 straight from Go, with no Ruby at all, takes 0.08 s, so select, select_hash and ruby_function stay several times
-slower than the C extension, while insert and point_lookup are close to it. ruby2go's docs/design.md decision 329
+slower than the C extension, while insert and point_lookup are close to it. rugaroo's docs/design.md decision 329
 has how the compiled calls got there (from 1.14 / 1.67 / 2.16 / 0.48 / 0.56 s). Fiddle calls keep the GVL, as the C
 extension does; fiddle's default hands it off and back on every call, which made MRI's reads ~5× slower.
 

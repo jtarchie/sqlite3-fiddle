@@ -4,7 +4,7 @@ require "minitest/autorun"
 require "sqlite3"
 require "tmpdir"
 
-# The sqlite3 gem's API over Fiddle; the same file runs in rb2go's testdata/test against the real gem.
+# The sqlite3 gem's API over Fiddle; the same file runs in rugaroo's testdata/test against the real gem.
 module Sqlite3Tests
   class DatabaseTest < Minitest::Test
     #: () -> SQLite3::Database
@@ -248,7 +248,7 @@ module Sqlite3Tests
       refute db.readonly?
       assert_equal "it''s", SQLite3::Database.quote("it's")
       assert_equal 3, SQLite3::SQLITE_VERSION.split(".").first.to_i
-      assert SQLite3.libversion > 3_000_000 # the gem bundles its own SQLite; rb2go loads the system's, so the numbers differ
+      assert SQLite3.libversion > 3_000_000 # the gem bundles its own SQLite; rugaroo loads the system's, so the numbers differ
     end
 
     def test_file_database

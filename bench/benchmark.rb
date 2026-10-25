@@ -1,6 +1,6 @@
 # rbs_inline: enabled
 
-# Times common sqlite3 workloads; prints one "name seconds" line each. Run as-is under MRI/JRuby, with -Ilib for this gem, or compiled by rb2go.
+# Times common sqlite3 workloads; prints one "name seconds" line each. Run as-is under MRI/JRuby, with -Ilib for this gem, or compiled by rugaroo.
 
 require "sqlite3"
 
