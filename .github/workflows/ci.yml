@@ -37,12 +37,14 @@ jobs:
         run: bundle exec rake test:gem TESTOPTS="--seed=1"
 
   rugaroo:
-    name: compiled by rugaroo / ${{ matrix.os }}
+    name: compiled by rugaroo (${{ matrix.backend }}) / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
+        # rugaroo's Fiddle calls C through purego by default, or through cgo with -cgo (its decision 426)
+        backend: [purego, cgo]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -58,5 +60,5 @@ jobs:
       - run: |
           rm -rf rugaroo/gems/sqlite3-fiddle && cp -r sqlite3-fiddle rugaroo/gems/sqlite3-fiddle
           rm -rf rugaroo/vendored/sqlite3-fiddle && mkdir -p rugaroo/vendored/sqlite3-fiddle && cp -R sqlite3-fiddle/lib/. rugaroo/vendored/sqlite3-fiddle/
-      - run: go run ./cmd/rugaroo test ../sqlite3-fiddle/test/sqlite3_test.rb --seed 1
+      - run: go run ./cmd/rugaroo test ${{ matrix.backend == 'cgo' && '-cgo' || '' }} ../sqlite3-fiddle/test/sqlite3_test.rb --seed 1
         working-directory: rugaroo

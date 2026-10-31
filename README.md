@@ -85,10 +85,13 @@ primary-key lookups, and a Ruby scalar function over every row. Seconds, lower i
 | MRI 4.0.7 `--yjit`, this gem          |   0.83 |   1.27 |        1.24 |         0.27 |          0.43 |
 | JRuby 10.1.2 (Java 27), this gem      |   2.09 |   1.19 |        0.97 |         0.29 |          0.53 |
 | rugaroo (compiled to Go), this gem    |   0.15 |   0.21 |        0.26 |         0.05 |          0.10 |
+| rugaroo `-cgo`, this gem              |   0.15 |   0.20 |        0.25 |         0.05 |          0.10 |
 
 Best of three runs on an Apple M4, Homebrew sqlite 3.54.0 (the C ext gem bundles 3.54.1). Reproduce with
 `ruby -Ilib bench/benchmark.rb`, `jruby -Ilib bench/benchmark.rb`, `ruby -e 'gem "sqlite3"' -e 'load "bench/benchmark.rb"'`,
-and `rugaroo build -o bench bench/benchmark.rb && ./bench`.
+and `rugaroo build -o bench bench/benchmark.rb && ./bench` (add `-cgo` for cgo instead of purego, rugaroo's decision 426).
+On Linux, where purego reads errno with a second C call under a thread lock, `-cgo` is 15–26% faster on every row
+(arm64: 0.196 → 0.167, 0.280 → 0.226, 0.379 → 0.285, 0.076 → 0.056, 0.146 → 0.108); on macOS the two are even.
 
 Each row of `select` crosses Fiddle about ten times (step, column count, type and value per column), as the C
 extension crosses into libsqlite3, and `ruby_function` crosses back into Ruby once per row plus three calls out.
